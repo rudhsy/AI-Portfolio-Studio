@@ -139,7 +139,7 @@ const SkillJar: React.FC<SkillJarProps> = ({ title, items }) => {
 
     const Bodies = Matter.Bodies;
     const Composite = Matter.Composite;
-    const Sleeping = Matter.Sleeping; // Correct module for waking bodies
+    const Body = Matter.Body;
 
     const updatePhysicsWorld = () => {
       const width = container.clientWidth;
@@ -200,12 +200,7 @@ const SkillJar: React.FC<SkillJarProps> = ({ title, items }) => {
          Composite.add(engine.world, newBodies);
       } else {
         // If resizing, we might want to wake them up
-        // FIX: Use Sleeping.set(body, false) instead of Body.setAwake(false)
-        currentBodies.forEach(b => {
-            if (Sleeping) {
-                Sleeping.set(b, false);
-            }
-        });
+        currentBodies.forEach(b => Body.setAwake(b, true));
       }
       
       setIsReady(true);
@@ -404,101 +399,109 @@ const AboutPage: React.FC = () => {
                                 className="col-span-1 md:col-span-1 bg-white dark:bg-[#111] p-6 md:p-8 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-800 flex items-center"
                             >
                                 <div className="text-lg md:text-xl font-medium text-gray-800 dark:text-gray-200 leading-snug select-none pointer-events-none">
-                                    Hello! I'm <span className="text-black dark:text-white font-bold bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded-md decoration-clone">Anirudh</span>, an Interaction Designer obsessed with making technology feel more human.
+                                    Hello! I'm <span className="text-black dark:text-white font-bold bg-yellow-100 dark:bg-yellow-900/30 px-2 rounded-lg">{RESUME.personal.name}</span>.
+                                    <br/><br/>
+                                    I bridge the gap between <span className="italic font-serif">"What if"</span> and <span className="italic font-serif">"What is"</span>.
                                 </div>
                             </SortableBentoItem>
                         );
                     }
 
-                    // --- 3. IMAGE CARD ---
+                    // --- 3. IMAGE ---
                     if (item.type === 'image') {
-                         return (
-                            <SortableBentoItem 
-                                key={item.id} 
-                                id={item.id}
-                                className="col-span-1 md:col-span-1 bg-gray-100 dark:bg-gray-800 rounded-3xl min-h-[240px] md:min-h-[320px]"
-                            >
-                                <img 
-                                    src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop" 
-                                    alt="Abstract" 
-                                    className="w-full h-full object-cover hover:scale-110 transition-transform duration-700 grayscale hover:grayscale-0"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
-                                    <span className="text-white text-sm font-bold uppercase tracking-widest">Mumbai, IN</span>
-                                </div>
-                            </SortableBentoItem>
-                        );
-                    }
-                    
-                    // --- 4. NARRATIVE TEXT ---
-                    if (item.type === 'narrative') {
-                         return (
-                            <SortableBentoItem 
-                                key={item.id} 
-                                id={item.id}
-                                className="col-span-1 md:col-span-2 bg-white dark:bg-[#111] p-8 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-800"
-                            >
-                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4">The Philosophy</h3>
-                                <p className="text-xl md:text-2xl font-serif italic text-gray-800 dark:text-gray-200 leading-relaxed">
-                                    "I believe the best interfaces are the ones you don't notice. They act as invisible bridges between intent and action."
-                                </p>
-                                <div className="mt-8 flex gap-4">
-                                    <div className="h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                                        <span className="text-xl">🧠</span>
-                                    </div>
-                                     <div className="h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                                        <span className="text-xl">✨</span>
-                                    </div>
-                                     <div className="h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                                        <span className="text-xl">🛠️</span>
-                                    </div>
-                                </div>
-                            </SortableBentoItem>
-                        );
-                    }
-
-                    // --- 5. SKILLS (Dynamic Physics Jars) ---
-                    if (item.type === 'skill') {
-                        // Make Skills 1x1 or 2x1 depending on content length roughly
-                        const isLarge = item.data.items.length > 8;
                         return (
                             <SortableBentoItem 
                                 key={item.id} 
                                 id={item.id}
-                                className={`col-span-1 ${isLarge ? 'md:col-span-2' : ''} min-h-[300px] bg-transparent p-0 overflow-visible`}
+                                className="col-span-1 bg-gray-100 dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden aspect-[3/4]"
+                            >
+                               <img 
+                                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1000&auto=format&fit=crop" 
+                                alt="Portrait" 
+                                className="w-full h-full object-cover select-none pointer-events-none scale-105 group-hover:scale-100 transition-transform duration-700" 
+                               />
+                               <div className="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-black/60 to-transparent pointer-events-none">
+                                  <div className="flex items-center gap-2 text-white text-sm font-mono backdrop-blur-md bg-white/10 w-fit px-3 py-1 rounded-full border border-white/20">
+                                     <MapPin size={12}/> Mumbai, India
+                                  </div>
+                               </div>
+                            </SortableBentoItem>
+                        );
+                    }
+
+                    // --- 4. NARRATIVE ---
+                    if (item.type === 'narrative') {
+                        return (
+                            <SortableBentoItem 
+                                key={item.id} 
+                                id={item.id}
+                                className="col-span-1 md:col-span-2 bg-white dark:bg-[#111] p-8 md:p-10 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col justify-center"
+                            >
+                               <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-accent mb-6 select-none flex items-center gap-2">
+                                  <div className="w-8 h-[1px] bg-accent"></div> The Narrative
+                               </h3>
+                               <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 leading-loose font-light select-none">
+                                 Currently studying at the <span className="font-bold text-black dark:text-white">{RESUME.personal.department}</span>, IIT Bombay. My journey isn't just about making things look good—it's about making them feel right. 
+                                 <br/><br/>
+                                 I specialize in <span className="text-black dark:text-white font-medium border-b border-accent/50">Interaction Design</span> and <span className="text-black dark:text-white font-medium border-b border-accent/50">XR</span>. I believe the best interfaces are the ones that don't just respond to inputs, but anticipate needs and spark joy. 
+                               </p>
+                            </SortableBentoItem>
+                        );
+                    }
+
+                    // --- 5. SKILL JAR (GRAVITY) ---
+                    if (item.type === 'skill' && 'data' in item) {
+                        const isLarge = item.data.items.length > 8;
+                        const spanClass = isLarge ? 'md:col-span-2' : 'md:col-span-1';
+                        
+                        return (
+                            <SortableBentoItem 
+                                key={item.id} 
+                                id={item.id}
+                                className={`col-span-1 ${spanClass} bg-white dark:bg-[#111] p-5 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col`}
                             >
                                 <SkillJar title={item.data.name} items={item.data.items} />
                             </SortableBentoItem>
                         );
                     }
 
-                    // --- 6. CONTACT ---
+                    // --- 6. CONTACT / FOOTER ---
                     if (item.type === 'contact') {
-                         return (
-                            <SortableBentoItem 
-                                key={item.id} 
-                                id={item.id}
-                                className="col-span-1 md:col-span-1 bg-accent text-white p-8 rounded-3xl shadow-lg shadow-accent/30 flex flex-col justify-between min-h-[240px]"
-                            >
-                                <div>
-                                    <h3 className="text-2xl font-bold mb-2">Let's Talk?</h3>
-                                    <p className="text-white/80 text-sm">Always open to discussing new ideas and opportunities.</p>
-                                </div>
-                                
-                                <div className="flex flex-col gap-3">
-                                    <a href={`mailto:hello@${RESUME.personal.portfolio}`} className="flex items-center gap-3 bg-white/20 hover:bg-white/30 p-3 rounded-xl transition-colors backdrop-blur-sm">
-                                        <Mail size={18} />
-                                        <span className="font-mono text-sm truncate">hello@rudhsy.com</span>
-                                    </a>
-                                    <a href={`https://${RESUME.personal.portfolio}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 bg-white/20 hover:bg-white/30 p-3 rounded-xl transition-colors backdrop-blur-sm">
-                                        <ArrowUpRight size={18} />
-                                        <span className="font-mono text-sm">rudhsy.com</span>
-                                    </a>
-                                </div>
-                            </SortableBentoItem>
-                        );
+                      return (
+                        <SortableBentoItem 
+                           key={item.id}
+                           id={item.id}
+                           className="col-span-1 md:col-span-4 bg-[#7B2CBF] rounded-3xl shadow-xl p-8 md:p-16 flex flex-col md:flex-row items-center justify-between gap-8 mt-8"
+                        >
+                            <div className="text-center md:text-left pointer-events-none select-none">
+                                <h2 className="text-3xl md:text-5xl font-black text-white mb-2">
+                                  Let's build something impossible.
+                                </h2>
+                                <p className="text-purple-100/80 font-medium">Open for collaborations and coffee chats.</p>
+                            </div>
+                            
+                            <div className="flex flex-wrap justify-center gap-4">
+                                <a 
+                                  href={`mailto:hello@${RESUME.personal.portfolio}`} 
+                                  className="px-6 py-3 rounded-full bg-white text-[#7B2CBF] font-bold hover:scale-105 transition-transform flex items-center gap-2 pointer-events-auto shadow-lg"
+                                  onPointerDown={(e) => e.stopPropagation()} // Prevent drag on button click
+                                >
+                                   <Mail size={18} /> Say Hello
+                                </a>
+                                <a 
+                                  href={`https://${RESUME.personal.portfolio}`} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="px-6 py-3 rounded-full border border-white/30 text-white hover:bg-white/10 transition-colors flex items-center gap-2 pointer-events-auto"
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                >
+                                  <Github size={18} /> GitHub <ArrowUpRight size={14}/>
+                                </a>
+                            </div>
+                        </SortableBentoItem>
+                      )
                     }
-
+                    
                     return null;
                 })}
 
