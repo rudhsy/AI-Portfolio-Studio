@@ -16,7 +16,7 @@
     "clsx": "^2.1.0",
     "@formkit/auto-animate": "^1.0.0",
     "@dnd-kit/core": "^6.0.8",
-    "@dnd-kit/sortable": "^7.0.2",
+    "@dnd-kit/sortable": "^9.0.0",
     "@dnd-kit/utilities": "^3.2.1"
   },
   "devDependencies": {
