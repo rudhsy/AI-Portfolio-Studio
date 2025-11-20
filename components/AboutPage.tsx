@@ -1,10 +1,10 @@
 
-import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { RESUME } from '../data/resume';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Matter from 'matter-js';
-import { Mail, Github, Linkedin, MapPin, GripHorizontal, ArrowUpRight } from 'lucide-react';
+import { Mail, Github, ArrowUpRight, MapPin, GripHorizontal } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -81,150 +81,184 @@ const SkillJar: React.FC<SkillJarProps> = ({ title, items }) => {
   const itemsRef = useRef<(HTMLDivElement | null)[]>([]);
   const engineRef = useRef<Matter.Engine | null>(null);
   const runnerRef = useRef<Matter.Runner | null>(null);
+  const wallsRef = useRef<Matter.Body[]>([]);
   
-  // Track dimensions to handle resizing
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [isReady, setIsReady] = useState(false);
 
+  // Initialize Engine Once
   useEffect(() => {
     if (!containerRef.current) return;
-    
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setDimensions({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height
-        });
-      }
-    });
 
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!containerRef.current || dimensions.width === 0 || dimensions.height === 0 || items.length === 0) return;
-
-    // Module Aliases
     const Engine = Matter.Engine;
-    const World = Matter.World;
-    const Bodies = Matter.Bodies;
     const Runner = Matter.Runner;
-    const Composite = Matter.Composite;
     const Mouse = Matter.Mouse;
     const MouseConstraint = Matter.MouseConstraint;
+    const Composite = Matter.Composite;
 
-    // 1. Setup Matter Engine
+    // Create Engine
     const engine = Engine.create();
-    const world = engine.world;
+    engine.gravity.y = 1; // Normal gravity
     engineRef.current = engine;
 
-    const { width, height } = dimensions;
+    const world = engine.world;
 
-    // 2. Create Static Boundaries (Walls)
-    const wallThickness = 100;
-    const ground = Bodies.rectangle(width / 2, height + wallThickness / 2, width * 2, wallThickness, { 
-        isStatic: true, 
-        render: { visible: false },
-        label: 'ground'
-    });
-    const leftWall = Bodies.rectangle(0 - wallThickness / 2, height / 2, wallThickness, height * 4, { 
-        isStatic: true, 
-        render: { visible: false },
-        label: 'leftWall'
-    });
-    const rightWall = Bodies.rectangle(width + wallThickness / 2, height / 2, wallThickness, height * 4, { 
-        isStatic: true, 
-        render: { visible: false },
-        label: 'rightWall'
-    });
-
-    Composite.add(world, [ground, leftWall, rightWall]);
-
-    // 3. Create Bodies for Skill Items
-    const itemBodies: Matter.Body[] = [];
-    
-    itemsRef.current.forEach((el, i) => {
-      if (!el || i >= items.length) return;
-      
-      // Reset transform to measure dimensions accurately
-      el.style.transform = 'none';
-      const w = el.offsetWidth || 100; // Fallback width
-      const h = el.offsetHeight || 40; // Fallback height
-      
-      // Spawn positions: Random spread across width, staggered height above container
-      const x = Math.random() * (width - w) + w / 2;
-      const y = -Math.random() * (height * 2) - 100; 
-      
-      const body = Bodies.rectangle(x, y, w, h, {
-        restitution: 0.5,      // Bounciness
-        friction: 0.3,         // Surface friction
-        frictionAir: 0.01,     // Air resistance
-        angle: (Math.random() - 0.5) * 0.2,
-        chamfer: { radius: h / 2 },
-        render: { visible: false },
-        label: `skill-${i}`
-      });
-      
-      itemBodies.push(body);
-    });
-
-    Composite.add(world, itemBodies);
-
-    // 4. Add Mouse Interaction
+    // Mouse Interaction
     const mouse = Mouse.create(containerRef.current);
-    // Remove events to prevent scrolling interference
+    // Disable scrolling interference
     // @ts-ignore
     mouse.element.removeEventListener("mousewheel", mouse.mousewheel);
     // @ts-ignore
     mouse.element.removeEventListener("DOMMouseScroll", mouse.mousewheel);
 
     const mouseConstraint = MouseConstraint.create(engine, {
-        mouse: mouse,
-        constraint: {
-            stiffness: 0.1,
-            render: { visible: false }
-        }
+      mouse: mouse,
+      constraint: {
+        stiffness: 0.1,
+        render: { visible: false }
+      }
     });
-
     Composite.add(world, mouseConstraint);
 
-    // 5. Run the Simulation
+    // Runner
     const runner = Runner.create();
     runnerRef.current = runner;
     Runner.run(runner, engine);
 
-    // 6. Render Loop
-    let animationId: number;
-    const update = () => {
-      if(!engineRef.current) return;
-      
-      itemBodies.forEach((body, i) => {
-        const el = itemsRef.current[i];
-        if (el) {
-            const { x, y } = body.position;
-            const angle = body.angle;
-            
-            // Apply transform
-            el.style.transform = `translate3d(${x - el.offsetWidth / 2}px, ${y - el.offsetHeight / 2}px, 0) rotate(${angle}rad)`;
-            
-            // Ensure visibility once physics starts updating positions
-            if (el.style.opacity !== '1') {
-                el.style.opacity = '1';
-            }
-        }
-      });
-      animationId = requestAnimationFrame(update);
-    };
-    update();
-
-    // Cleanup
     return () => {
-      cancelAnimationFrame(animationId);
       Runner.stop(runner);
       Engine.clear(engine);
       Composite.clear(world, false, true);
     };
-  }, [items, dimensions]); // Re-run if items or dimensions change
+  }, []);
+
+  // Handle Resizing & Bodies Creation
+  useEffect(() => {
+    const container = containerRef.current;
+    const engine = engineRef.current;
+    if (!container || !engine) return;
+
+    const Bodies = Matter.Bodies;
+    const Composite = Matter.Composite;
+    const Sleeping = Matter.Sleeping; // Correct module for waking bodies
+
+    const updatePhysicsWorld = () => {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+
+      if (width === 0 || height === 0) return;
+
+      // 1. Update/Create Walls
+      const wallThickness = 60;
+      
+      // Remove old walls if they exist
+      if (wallsRef.current.length > 0) {
+        Composite.remove(engine.world, wallsRef.current);
+      }
+
+      const ground = Bodies.rectangle(width / 2, height + wallThickness / 2, width * 2, wallThickness, { 
+          isStatic: true, label: 'ground' 
+      });
+      const leftWall = Bodies.rectangle(0 - wallThickness / 2, height / 2, wallThickness, height * 4, { 
+          isStatic: true, label: 'leftWall' 
+      });
+      const rightWall = Bodies.rectangle(width + wallThickness / 2, height / 2, wallThickness, height * 4, { 
+          isStatic: true, label: 'rightWall' 
+      });
+
+      wallsRef.current = [ground, leftWall, rightWall];
+      Composite.add(engine.world, wallsRef.current);
+
+      // 2. Create/Update Skill Bodies
+      // We only create bodies if they don't exist to preserve state
+      const currentBodies = Composite.allBodies(engine.world).filter(b => b.label.startsWith('skill-'));
+      
+      if (currentBodies.length !== items.length) {
+         // Clear existing skills to completely reset if count mismatches (simplest approach for now)
+         Composite.remove(engine.world, currentBodies);
+         
+         const newBodies: Matter.Body[] = [];
+         itemsRef.current.forEach((el, i) => {
+            if (!el || i >= items.length) return;
+            
+            // Reset to measure
+            el.style.transform = 'none';
+            const w = el.offsetWidth + 4; // Add slight padding
+            const h = el.offsetHeight + 4;
+
+            const x = Math.random() * (width - w) + w / 2;
+            const y = -Math.random() * 500 - 100; // Start above view
+
+            const body = Bodies.rectangle(x, y, w, h, {
+              restitution: 0.4,
+              friction: 0.5,
+              angle: (Math.random() - 0.5) * 0.5,
+              chamfer: { radius: h / 2 },
+              label: `skill-${i}`
+            });
+            newBodies.push(body);
+         });
+         Composite.add(engine.world, newBodies);
+      } else {
+        // If resizing, we might want to wake them up
+        // FIX: Use Sleeping.set(body, false) instead of Body.setAwake(false)
+        currentBodies.forEach(b => {
+            if (Sleeping) {
+                Sleeping.set(b, false);
+            }
+        });
+      }
+      
+      setIsReady(true);
+    };
+
+    // Initial Update
+    updatePhysicsWorld();
+
+    // Observer for resizing
+    const observer = new ResizeObserver(() => {
+       updatePhysicsWorld();
+    });
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, [items]);
+
+  // Render Loop (Sync DOM with Physics)
+  useEffect(() => {
+    let animationId: number;
+    
+    const update = () => {
+      if (engineRef.current) {
+         const bodies = Matter.Composite.allBodies(engineRef.current.world);
+         
+         bodies.forEach((body) => {
+            if (body.label.startsWith('skill-')) {
+                const index = parseInt(body.label.split('-')[1]);
+                const el = itemsRef.current[index];
+                if (el) {
+                    const { x, y } = body.position;
+                    el.style.transform = `translate3d(${x - el.offsetWidth / 2}px, ${y - el.offsetHeight / 2}px, 0) rotate(${body.angle}rad)`;
+                    if (el.style.opacity === '0') el.style.opacity = '1';
+                }
+            }
+         });
+      }
+      animationId = requestAnimationFrame(update);
+    };
+    update();
+
+    // Fallback to ensure visibility if physics delays
+    const timeoutId = setTimeout(() => {
+         itemsRef.current.forEach(el => {
+             if(el) el.style.opacity = '1';
+         });
+    }, 500);
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -244,8 +278,8 @@ const SkillJar: React.FC<SkillJarProps> = ({ title, items }) => {
              {items.map((skill, i) => (
                  <div 
                     key={i} 
-                    ref={(el) => { itemsRef.current[i] = el; }}
-                    className="absolute top-0 left-0 px-3 py-1.5 rounded-full bg-white dark:bg-[#222] text-[11px] font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.08)] border border-gray-100 dark:border-white/10 select-none whitespace-nowrap will-change-transform z-20 opacity-0"
+                    ref={(el) => { if(el) itemsRef.current[i] = el; }}
+                    className="absolute top-0 left-0 px-3 py-1.5 rounded-full bg-white dark:bg-[#222] text-[11px] font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.08)] border border-gray-100 dark:border-white/10 select-none whitespace-nowrap will-change-transform z-20 opacity-0 transition-opacity duration-300"
                  >
                     {skill}
                  </div>
@@ -370,109 +404,101 @@ const AboutPage: React.FC = () => {
                                 className="col-span-1 md:col-span-1 bg-white dark:bg-[#111] p-6 md:p-8 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-800 flex items-center"
                             >
                                 <div className="text-lg md:text-xl font-medium text-gray-800 dark:text-gray-200 leading-snug select-none pointer-events-none">
-                                    Hello! I'm <span className="text-black dark:text-white font-bold bg-yellow-100 dark:bg-yellow-900/30 px-2 rounded-lg">{RESUME.personal.name}</span>.
-                                    <br/><br/>
-                                    I bridge the gap between <span className="italic font-serif">"What if"</span> and <span className="italic font-serif">"What is"</span>.
+                                    Hello! I'm <span className="text-black dark:text-white font-bold bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded-md decoration-clone">Anirudh</span>, an Interaction Designer obsessed with making technology feel more human.
                                 </div>
                             </SortableBentoItem>
                         );
                     }
 
-                    // --- 3. IMAGE ---
+                    // --- 3. IMAGE CARD ---
                     if (item.type === 'image') {
-                        return (
+                         return (
                             <SortableBentoItem 
                                 key={item.id} 
                                 id={item.id}
-                                className="col-span-1 bg-gray-100 dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden aspect-[3/4]"
+                                className="col-span-1 md:col-span-1 bg-gray-100 dark:bg-gray-800 rounded-3xl min-h-[240px] md:min-h-[320px]"
                             >
-                               <img 
-                                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1000&auto=format&fit=crop" 
-                                alt="Portrait" 
-                                className="w-full h-full object-cover select-none pointer-events-none scale-105 group-hover:scale-100 transition-transform duration-700" 
-                               />
-                               <div className="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-black/60 to-transparent pointer-events-none">
-                                  <div className="flex items-center gap-2 text-white text-sm font-mono backdrop-blur-md bg-white/10 w-fit px-3 py-1 rounded-full border border-white/20">
-                                     <MapPin size={12}/> Mumbai, India
-                                  </div>
-                               </div>
+                                <img 
+                                    src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop" 
+                                    alt="Abstract" 
+                                    className="w-full h-full object-cover hover:scale-110 transition-transform duration-700 grayscale hover:grayscale-0"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                                    <span className="text-white text-sm font-bold uppercase tracking-widest">Mumbai, IN</span>
+                                </div>
                             </SortableBentoItem>
                         );
                     }
-
-                    // --- 4. NARRATIVE ---
+                    
+                    // --- 4. NARRATIVE TEXT ---
                     if (item.type === 'narrative') {
-                        return (
+                         return (
                             <SortableBentoItem 
                                 key={item.id} 
                                 id={item.id}
-                                className="col-span-1 md:col-span-2 bg-white dark:bg-[#111] p-8 md:p-10 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col justify-center"
+                                className="col-span-1 md:col-span-2 bg-white dark:bg-[#111] p-8 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-800"
                             >
-                               <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-accent mb-6 select-none flex items-center gap-2">
-                                  <div className="w-8 h-[1px] bg-accent"></div> The Narrative
-                               </h3>
-                               <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 leading-loose font-light select-none">
-                                 Currently studying at the <span className="font-bold text-black dark:text-white">{RESUME.personal.department}</span>, IIT Bombay. My journey isn't just about making things look good—it's about making them feel right. 
-                                 <br/><br/>
-                                 I specialize in <span className="text-black dark:text-white font-medium border-b border-accent/50">Interaction Design</span> and <span className="text-black dark:text-white font-medium border-b border-accent/50">XR</span>. I believe the best interfaces are the ones that don't just respond to inputs, but anticipate needs and spark joy. 
-                               </p>
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4">The Philosophy</h3>
+                                <p className="text-xl md:text-2xl font-serif italic text-gray-800 dark:text-gray-200 leading-relaxed">
+                                    "I believe the best interfaces are the ones you don't notice. They act as invisible bridges between intent and action."
+                                </p>
+                                <div className="mt-8 flex gap-4">
+                                    <div className="h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                                        <span className="text-xl">🧠</span>
+                                    </div>
+                                     <div className="h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                                        <span className="text-xl">✨</span>
+                                    </div>
+                                     <div className="h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                                        <span className="text-xl">🛠️</span>
+                                    </div>
+                                </div>
                             </SortableBentoItem>
                         );
                     }
 
-                    // --- 5. SKILL JAR (GRAVITY) ---
-                    if (item.type === 'skill' && 'data' in item) {
+                    // --- 5. SKILLS (Dynamic Physics Jars) ---
+                    if (item.type === 'skill') {
+                        // Make Skills 1x1 or 2x1 depending on content length roughly
                         const isLarge = item.data.items.length > 8;
-                        const spanClass = isLarge ? 'md:col-span-2' : 'md:col-span-1';
-                        
                         return (
                             <SortableBentoItem 
                                 key={item.id} 
                                 id={item.id}
-                                className={`col-span-1 ${spanClass} bg-white dark:bg-[#111] p-5 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col`}
+                                className={`col-span-1 ${isLarge ? 'md:col-span-2' : ''} min-h-[300px] bg-transparent p-0 overflow-visible`}
                             >
                                 <SkillJar title={item.data.name} items={item.data.items} />
                             </SortableBentoItem>
                         );
                     }
 
-                    // --- 6. CONTACT / FOOTER ---
+                    // --- 6. CONTACT ---
                     if (item.type === 'contact') {
-                      return (
-                        <SortableBentoItem 
-                           key={item.id}
-                           id={item.id}
-                           className="col-span-1 md:col-span-4 bg-[#7B2CBF] rounded-3xl shadow-xl p-8 md:p-16 flex flex-col md:flex-row items-center justify-between gap-8 mt-8"
-                        >
-                            <div className="text-center md:text-left pointer-events-none select-none">
-                                <h2 className="text-3xl md:text-5xl font-black text-white mb-2">
-                                  Let's build something impossible.
-                                </h2>
-                                <p className="text-purple-100/80 font-medium">Open for collaborations and coffee chats.</p>
-                            </div>
-                            
-                            <div className="flex flex-wrap justify-center gap-4">
-                                <a 
-                                  href={`mailto:hello@${RESUME.personal.portfolio}`} 
-                                  className="px-6 py-3 rounded-full bg-white text-[#7B2CBF] font-bold hover:scale-105 transition-transform flex items-center gap-2 pointer-events-auto shadow-lg"
-                                  onPointerDown={(e) => e.stopPropagation()} // Prevent drag on button click
-                                >
-                                   <Mail size={18} /> Say Hello
-                                </a>
-                                <a 
-                                  href={`https://${RESUME.personal.portfolio}`} 
-                                  target="_blank" 
-                                  rel="noreferrer"
-                                  className="px-6 py-3 rounded-full border border-white/30 text-white hover:bg-white/10 transition-colors flex items-center gap-2 pointer-events-auto"
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                >
-                                  <Github size={18} /> GitHub <ArrowUpRight size={14}/>
-                                </a>
-                            </div>
-                        </SortableBentoItem>
-                      )
+                         return (
+                            <SortableBentoItem 
+                                key={item.id} 
+                                id={item.id}
+                                className="col-span-1 md:col-span-1 bg-accent text-white p-8 rounded-3xl shadow-lg shadow-accent/30 flex flex-col justify-between min-h-[240px]"
+                            >
+                                <div>
+                                    <h3 className="text-2xl font-bold mb-2">Let's Talk?</h3>
+                                    <p className="text-white/80 text-sm">Always open to discussing new ideas and opportunities.</p>
+                                </div>
+                                
+                                <div className="flex flex-col gap-3">
+                                    <a href={`mailto:hello@${RESUME.personal.portfolio}`} className="flex items-center gap-3 bg-white/20 hover:bg-white/30 p-3 rounded-xl transition-colors backdrop-blur-sm">
+                                        <Mail size={18} />
+                                        <span className="font-mono text-sm truncate">hello@rudhsy.com</span>
+                                    </a>
+                                    <a href={`https://${RESUME.personal.portfolio}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 bg-white/20 hover:bg-white/30 p-3 rounded-xl transition-colors backdrop-blur-sm">
+                                        <ArrowUpRight size={18} />
+                                        <span className="font-mono text-sm">rudhsy.com</span>
+                                    </a>
+                                </div>
+                            </SortableBentoItem>
+                        );
                     }
-                    
+
                     return null;
                 })}
 
