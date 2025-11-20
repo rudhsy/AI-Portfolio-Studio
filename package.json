@@ -1,0 +1,29 @@
+{
+  "name": "anirudh-a---interactive-portfolio",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "lucide-react": "0.344.0",
+    "gsap": "3.12.5",
+    "matter-js": "0.19.0",
+    "clsx": "2.1.0",
+    "@formkit/auto-animate": "1.0.0",
+    "@dnd-kit/core": "latest",
+    "@dnd-kit/sortable": "dnd-kit",
+    "@dnd-kit/utilities": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
